@@ -276,6 +276,93 @@ var niuer = (function() {
 		return this; //这一块儿有点儿乱，到底用不用返回this？是为每个对象创建一个ajax对象，还是只需要一个全局的就可以了呢？
 	}
 	
+	//动画
+	Niuer.prototype.animate=function(obj){
+		for (var i = 0; i < this.elements.length; i ++) {
+			var element = this.elements[i];
+			var attr = obj['attr'] == 'x' ? 'left' : obj['attr'] == 'y' ? 'top' : 
+						   obj['attr'] == 'w' ? 'width' : obj['attr'] == 'h' ? 'height' : 
+						   obj['attr'] == 'o' ? 'opacity' : 'left';
+
+			
+			var start = obj['start'] != undefined ? obj['start'] : 
+							attr == 'opacity' ? parseFloat(niuer.outerTools.getStyle(element, attr)) * 100 : 
+													   parseInt(niuer.outerTools.getStyle(element, attr));
+			
+			var t = obj['time'] != undefined ? obj['time'] : 30;//可选，默认30毫秒执行一次
+			var step = obj['step'] != undefined ? obj['step'] : 10;//可选，每次运行10像素
+			
+			var alter = obj['alter'];
+			var target = obj['target'];
+			var speed = obj['speed'] != undefined ? obj['speed'] : 6;//可选，默认缓冲速度为6
+			var type = obj['type'] == 0 ? 'constant' : obj['type'] == 1 ? 'buffer' : 'buffer';//可选，0表示匀速，1表示缓冲，默认缓冲
+			
+			
+			if (alter != undefined && target == undefined) {
+				target = alter + start;
+			} else if (alter == undefined && target == undefined) {
+				throw new Error('alter增量或target目标量必须传一个！');
+			}
+			
+			if (start > target) step = -step;//如果start的值比target的值大则step的值设为负
+			
+			if (attr == 'opacity') {
+				element.style.opacity = parseInt(start) / 100;
+				element.style.filter = 'alpha(opacity=' + parseInt(start) +')';
+			} else {
+				element.style[attr] = start + 'px';
+			}
+			
+			
+			clearInterval(window.timer);
+			timer = setInterval(function () {
+			
+				if (type == 'buffer') {
+					step = attr == 'opacity' ? (target - parseFloat(niuer.outerTools.getStyle(element, attr)) * 100) / speed ://透明度
+														 (target - parseInt(niuer.outerTools.getStyle(element, attr))) / speed;//长度
+					step = step > 0 ? Math.ceil(step) : Math.floor(step);
+				}
+				
+				if (attr == 'opacity') {
+					if (step == 0) {
+						setOpacity();
+					} else if (step > 0 && Math.abs(parseFloat(niuer.outerTools.getStyle(element, attr)) * 100 - target) <= step) {
+						setOpacity();
+					} else if (step < 0 && (parseFloat(niuer.outerTools.getStyle(element, attr)) * 100 - target) <= Math.abs(step)) {
+						setOpacity();
+					} else {
+						var temp = parseFloat(niuer.outerTools.getStyle(element, attr)) * 100;
+						element.style.opacity = parseInt(temp + step) / 100;
+						element.style.filter = 'alpha(opacity=' + parseInt(temp + step) + ')'
+					}
+
+				} else {
+					if (step == 0) {
+						setTarget();
+					} else if (step > 0 && Math.abs(parseInt(niuer.outerTools.getStyle(element, attr)) - target) <= step) {
+						setTarget();
+					} else if (step < 0 && (parseInt(niuer.outerTools.getStyle(element, attr)) - target) <= Math.abs(step)) {
+						setTarget();
+					} else {
+						element.style[attr] = parseInt(niuer.outerTools.getStyle(element, attr)) + step + 'px';
+					}
+				}
+			}, t);
+			
+			function setTarget() {
+				element.style[attr] = target + 'px';
+				clearInterval(timer);
+			}
+			
+			function setOpacity() {
+				element.style.opacity = parseInt(target) / 100;
+				element.style.filter = 'alpha(opacity=' + parseInt(target) + ')';
+				clearInterval(timer);
+			}
+		}
+		return this;
+	}
+	
 	/*=====================不对外开放的工具函数=======================*/
 	Niuer.innerTools={
 		//创建XMLHttpRequest对象
@@ -331,7 +418,7 @@ niuer.outerTools={
 		}
 		return arr.join('&');
 	},
-	//快浏览器获取视口大小
+	//获取浏览器视口大小
 	getInner:function() {
 		if (typeof window.innerWidth != 'undefined') {
 			return {
@@ -344,6 +431,39 @@ niuer.outerTools={
 				height : document.documentElement.clientHeight
 			}
 		}
+	},
+	// 获取地址栏的参数数组
+	getUrlParams:function(){
+		var search = window.location.search ; 
+		// 写入数据字典
+		var tmparray = search.substr(1,search.length).split("&");
+		var paramsArray = new Array; 
+		if( tmparray != null){
+			for(var i = 0;i<tmparray.length;i++){
+				var reg = /[=|^==]/;    // 用=进行拆分，但不包括==
+				var set1 = tmparray[i].replace(reg,'&');
+				var tmpStr2 = set1.split('&');
+				var array = new Array ; 
+				array[tmpStr2[0]] = tmpStr2[1] ; 
+				paramsArray.push(array);
+			}
+		}
+		// 将参数数组进行返回
+		return paramsArray ;     
+	},
+	// 根据参数名称获取参数值
+	getParamValue:function(name){
+		var paramsArray = niuer.outerTools.getUrlParams();
+		if(paramsArray != null){
+			for(var i = 0 ; i < paramsArray.length ; i ++ ){
+				for(var  j in paramsArray[i] ){
+					if( j == name ){
+						return paramsArray[i][j] ; 
+					}
+				}
+			}
+		}
+		return null ; 
 	},
 	//跨浏览器获取Style
 	getStyle:function(element, attr) {
